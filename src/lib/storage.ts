@@ -19,7 +19,7 @@ export async function saveUploadedImage(file: File) {
     throw new Error("单张图片不能超过 10MB");
   }
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
+  const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads");
   await mkdir(uploadDir, { recursive: true });
 
   const fileName = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
