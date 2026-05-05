@@ -16,7 +16,7 @@ import { deriveShipStock, type ShipStock } from "@/lib/noro6";
 
 type TagDTO = { id: string; name: string; colorClass: string; sortOrder: number; isActive: boolean };
 type PlanDTO = { planId: string; tagId: string; assignedData: string; note: string | null };
-type UserDTO = { userId: string; userName: string; hasShipData: boolean; plans: PlanDTO[] };
+type UserDTO = { userId: string; userName: string; avatarUrl: string | null; hasShipData: boolean; plans: PlanDTO[] };
 
 type GlobalData = { tags: TagDTO[]; users: UserDTO[] };
 
@@ -29,6 +29,7 @@ type LockPlanGodViewProps = {
   initialUsers: Array<{
     userId: string;
     userName: string;
+    avatarUrl: string | null;
     hasShipData: boolean;
     shipDataRaw: string;
     plans: PlanDTO[];
@@ -521,6 +522,7 @@ export function LockPlanGodView({ initialTags, initialUsers }: LockPlanGodViewPr
               <UserLockRow
                 userId={user.userId}
                 userName={user.userName}
+                avatarUrl={user.avatarUrl}
                 tags={activeTags}
                 plans={derivedPlans}
                 ships={shipsByUser[user.userId] ?? []}

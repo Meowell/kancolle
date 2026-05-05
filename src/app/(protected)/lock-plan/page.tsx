@@ -11,7 +11,7 @@ export default async function LockPlanGlobalPage() {
       orderBy: { sortOrder: "asc" },
     }),
     prisma.user.findMany({
-      select: { id: true, name: true, shipData: true },
+      select: { id: true, name: true, avatarUrl: true, shipData: true },
       orderBy: { name: "asc" },
     }),
     prisma.lockPlan.findMany({
@@ -37,6 +37,7 @@ export default async function LockPlanGlobalPage() {
     .map((u) => ({
       userId: u.id,
       userName: u.name,
+      avatarUrl: u.avatarUrl,
       hasShipData: !!(u.shipData && u.shipData.trim()),
       shipDataRaw: u.shipData ?? "",
       plans: (plansByUser.get(u.id) ?? []).map((p) => ({

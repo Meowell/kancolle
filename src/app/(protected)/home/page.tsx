@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { AvatarEditor } from "@/components/common/avatar-editor";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/auth";
 import Link from "next/link";
@@ -28,6 +29,8 @@ export default async function HomePage() {
           只给几个人用的一站式工具吧大概
         </p>
       </div>
+
+      <AvatarEditor initialAvatarUrl={user.avatarUrl} userName={user.name} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {statsConfig.map((stat) => (

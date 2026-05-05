@@ -73,7 +73,7 @@ type Record = {
   imageUrl: string | null;
   fleetData: string | null;
   createdAt: Date | string;
-  user: { id: string; name: string };
+  user: { id: string; name: string; avatarUrl: string | null };
 };
 
 interface RoutineRecordsProps {
@@ -385,7 +385,10 @@ function RecordsList({
                           {new Date(r.createdAt).toLocaleString("zh-CN")}
                         </p>
                         <span className="text-slate-600">·</span>
-                        <span className="text-xs text-emerald-500/80">
+                        {r.user.avatarUrl && (
+                          <img src={r.user.avatarUrl} alt={r.user.name} className="w-6 h-6 rounded-full object-cover" />
+                        )}
+                        <span className="text-sm text-emerald-500/80">
                           {r.user.name}
                         </span>
                       </div>

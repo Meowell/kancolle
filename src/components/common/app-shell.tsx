@@ -15,7 +15,7 @@ function cx(...classes: (string | boolean | undefined)[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function AppShell({ children, userName }: { children: React.ReactNode; userName: string }) {
+export function AppShell({ children, userName, avatarUrl }: { children: React.ReactNode; userName: string; avatarUrl?: string }) {
   const pathname = usePathname();
 
   return (
@@ -55,6 +55,13 @@ export function AppShell({ children, userName }: { children: React.ReactNode; us
 
           {/* User area */}
           <div className="flex items-center gap-3 shrink-0">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={userName} className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-600" />
+            ) : (
+              <span className="w-9 h-9 rounded-full bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-400 ring-1 ring-blue-500/30">
+                {userName.charAt(0).toUpperCase()}
+              </span>
+            )}
             <span className="hidden sm:inline text-sm text-slate-400">{userName}</span>
             <Link
               href="/logout"

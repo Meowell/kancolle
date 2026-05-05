@@ -11,6 +11,7 @@ type PlanInfo = { planId: string; tagId: string; assignedData: string; note: str
 type UserLockRowProps = {
   userId: string;
   userName: string;
+  avatarUrl?: string | null;
   tags: TagInfo[];
   plans: PlanInfo[];
   ships: ShipStock[];
@@ -22,7 +23,7 @@ type UserLockRowProps = {
 };
 
 export function UserLockRow({
-  userId, userName, tags, plans, ships, hasShipData,
+  userId, userName, avatarUrl, tags, plans, ships, hasShipData,
   onCellClick, onRemoveShip, onReorder, onDropShip,
 }: UserLockRowProps) {
   const planByTagId = new Map(plans.map((p) => [p.tagId, p]));
@@ -30,9 +31,13 @@ export function UserLockRow({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white ring-2 ring-blue-500/30">
-          {userName.charAt(0).toUpperCase()}
-        </div>
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={userName} className="h-8 w-8 rounded-full object-cover ring-2 ring-blue-500/30" />
+        ) : (
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white ring-2 ring-blue-500/30">
+            {userName.charAt(0).toUpperCase()}
+          </div>
+        )}
         <h3 className="text-base font-bold text-white">{userName}</h3>
         {!hasShipData && (
           <Badge variant="secondary" className="text-yellow-400 bg-yellow-500/10 border-yellow-500/20">

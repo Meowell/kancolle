@@ -1,0 +1,71 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export function AvatarEditor({ initialAvatarUrl, userName }: { initialAvatarUrl: string | null; userName: string }) {
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleUpload(file: File) {
+    setUploading(true); setErr("");
+    try {
+      const data = new FormData(); data.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: data });
+      const p = await res.json();
+      if (!res.ok) throw new Error(p.error ?? "上传失败");
+      const url = p.imageUrl as string;
+      // save avatarUrl to user
+      const patchRes = await fetch("/api/auth/avatar", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ avatarUrl: url }),
+      });
+      if (!patchRes.ok) throw new Error("保存头像失败");
+      setAvatarUrl(url);
+    } catch (e) { setErr(e instanceof Error ? e.message : "上传失败"); }
+    finally { setUploading(false); }
+  }
+
+  async function handleRemove() {
+    setErr("");
+    const res = await fetch("/api/auth/avatar", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ avatarUrl: null }),
+    });
+    if (!res.ok) { setErr("清除头像失败"); return; }
+    setAvatarUrl(null);
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-700/50 bg-slate-800/70 backdrop-blur-sm p-6 shadow-lg shadow-black/10">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🖼️</span>
+        <h2 className="font-semibold text-white">个人头像</h2>
+      </div>
+      <div className="flex items-center gap-4">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={userName} className="w-16 h-16 rounded-full object-cover ring-2 ring-blue-500/50" />
+        ) : (
+          <span className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center text-2xl font-bold text-blue-400 ring-2 ring-blue-500/30">
+            {userName.charAt(0).toUpperCase()}
+          </span>
+        )}
+        <div className="flex-1 space-y-2">
+          <Input type="file" accept="image/*" disabled={uploading} onChange={(e) => { const file = e.target.files?.[0]; if (file) handleUpload(file); }} />
+          <p className="text-xs text-slate-500">支持 jpg / png / webp / gif，最大 10MB</p>
+          {uploading && <p className="text-xs text-blue-400">上传中...</p>}
+          {err && <p className="text-xs text-red-400">{err}</p>}
+        </div>
+        {avatarUrl && (
+          <Button variant="ghost" onClick={handleRemove} className="text-xs text-slate-400 hover:text-red-400 shrink-0">
+            清除
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

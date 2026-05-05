@@ -43,7 +43,7 @@ export default async function RoutinePage({
       orderBy: { createdAt: "desc" },
       skip: (currentPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { user: { select: { id: true, name: true } } },
+      include: { user: { select: { id: true, name: true, avatarUrl: true } } },
     }),
     prisma.routineRecord.groupBy({ by: ["seaArea"], orderBy: { seaArea: "asc" } }),
     prisma.routineRecord.groupBy({ by: ["userId"], orderBy: { userId: "asc" } }),
@@ -71,7 +71,7 @@ export default async function RoutinePage({
     imageUrl: r.imageUrl,
     fleetData: r.fleetData,
     createdAt: r.createdAt.toISOString(),
-    user: { id: r.user.id, name: r.user.name },
+    user: { id: r.user.id, name: r.user.name, avatarUrl: r.user.avatarUrl },
   }));
 
   const seaAreas = seaAreaGroups.map((g) => g.seaArea);
