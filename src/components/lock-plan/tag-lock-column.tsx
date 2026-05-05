@@ -1,0 +1,281 @@
+"use client";
+
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+
+import { ShipCell } from "@/components/lock-plan/ship-cell";
+import { Badge } from "@/components/ui/badge";
+import { parseAssignments, type LockAssignment } from "@/lib/lock-plan-helpers";
+import { type ShipStock } from "@/lib/noro6";
+import { cn } from "@/lib/utils";
+
+type TagLockColumnProps = {
+  tagId: string;
+  tagName: string;
+  tagColorClass: string;
+  assignedData: string;
+  ships: ShipStock[];
+  userId: string;
+  onCellClick: (tagId: string, rowIndex: number) => void;
+  onRemoveShip: (tagId: string, uniqueId: string) => void;
+  onReorder?: (tagId: string, newAssignments: (LockAssignment | null)[]) => void;
+  onDropShip?: (targetTagId: string, uniqueId: string, shipId: number, sourceTagId: string, targetIndex: number) => void;
+};
+
+const MAX_COLS = 3;
+const ROWS_PER_COL = 6;
+const MAX_SLOTS = MAX_COLS * ROWS_PER_COL;
+
+type DragPayload = {
+  uniqueId: string;
+  shipId: number;
+  sourceTagId: string;
+  sourceUserId: string;
+};
+
+const STORAGE_PREFIX = "kc-lock-slots-";
+
+function loadSlotCount(tagId: string, minCount: number): number {
+  try {
+    const stored = localStorage.getItem(STORAGE_PREFIX + tagId);
+    if (stored) {
+      const val = parseInt(stored, 10);
+      if (val >= minCount && val <= MAX_SLOTS) return val;
+    }
+  } catch { /* ignore */ }
+  return minCount;
+}
+
+function saveSlotCount(tagId: string, count: number) {
+  try { localStorage.setItem(STORAGE_PREFIX + tagId, String(count)); } catch { /* ignore */ }
+}
+
+export function TagLockColumn({
+  tagId, tagName, tagColorClass, assignedData, ships, userId,
+  onCellClick, onRemoveShip, onReorder, onDropShip,
+}: TagLockColumnProps) {
+  const assignments = useMemo(() => parseAssignments(assignedData), [assignedData]);
+
+  const filledCount = useMemo(
+    () => assignments.filter((a): a is LockAssignment => a !== null).length,
+    [assignments],
+  );
+
+  // Server-safe default: no localStorage access during SSR
+  const defaultSlotCount = Math.max(1, Math.min(filledCount, MAX_SLOTS));
+
+  const [slotCount, setSlotCount] = useState(defaultSlotCount);
+  const [slotInitialized, setSlotInitialized] = useState(false);
+
+  // Hydrate slotCount from localStorage on client mount (avoids hydration mismatch)
+  useEffect(() => {
+    setSlotInitialized(true);
+    const saved = loadSlotCount(tagId, defaultSlotCount);
+    if (saved !== slotCount) {
+      setSlotCount(saved);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist slotCount to localStorage (skip during initial hydration)
+  useEffect(() => {
+    if (slotInitialized) {
+      saveSlotCount(tagId, slotCount);
+    }
+  }, [tagId, slotCount, slotInitialized]);
+
+  // Auto-expand slotCount when filled count exceeds current slots
+  useEffect(() => {
+    if (filledCount > slotCount) {
+      setSlotCount(filledCount);
+    }
+  }, [filledCount, slotCount]);
+
+  // Always show enough slots: at least slotCount, at least filledCount
+  const visibleCount = Math.min(Math.max(slotCount, filledCount), MAX_SLOTS);
+
+  // Column-level drag-over highlight (not per-cell, to avoid re-renders during drag)
+  const [columnDragOver, setColumnDragOver] = useState(false);
+
+  const shipByUniqueId = useMemo(() => {
+    const map = new Map<string, ShipStock>();
+    for (const s of ships) map.set(s.uniqueId, s);
+    return map;
+  }, [ships]);
+
+  const slots: Array<{ uniqueId: string; shipId: number } | null> = [
+    ...assignments.slice(0, visibleCount),
+    ...Array.from({ length: Math.max(0, visibleCount - assignments.length) }, () => null),
+  ];
+
+  // Dynamic column count based on visible slots
+  const numCols = Math.ceil(visibleCount / ROWS_PER_COL);
+
+  const columns: Array<Array<{ uniqueId: string; shipId: number } | null>> = [];
+  for (let col = 0; col < numCols; col++) {
+    columns.push(slots.slice(col * ROWS_PER_COL, (col + 1) * ROWS_PER_COL));
+  }
+
+  // ---- Drag handlers ----
+
+  const handleDragStart = useCallback((e: React.DragEvent, assignment: { uniqueId: string; shipId: number }) => {
+    const payload: DragPayload = {
+      uniqueId: assignment.uniqueId,
+      shipId: assignment.shipId,
+      sourceTagId: tagId,
+      sourceUserId: userId,
+    };
+    e.dataTransfer.setData("application/json", JSON.stringify(payload));
+    e.dataTransfer.effectAllowed = "move";
+  }, [tagId, userId]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }, []);
+
+  // Column-level drag enter/leave for whole-column drop target
+  const handleColumnDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setColumnDragOver(true);
+  }, []);
+
+  const handleColumnDragLeave = useCallback((e: React.DragEvent) => {
+    const target = e.currentTarget as HTMLElement;
+    if (!target.contains(e.relatedTarget as Node)) {
+      setColumnDragOver(false);
+    }
+  }, []);
+
+  // Process drag payload — insert at exact dropIndex, allowing gaps
+  function processDrop(dragData: DragPayload, dropIndex: number) {
+    if (dragData.sourceTagId === tagId) {
+      const currentSlot = slots[dropIndex];
+      if (currentSlot?.uniqueId === dragData.uniqueId) return;
+    }
+
+    if (dragData.sourceTagId === tagId) {
+      // Same tag: reorder — insert at exact dropIndex, preserving gaps
+      const newArr: (LockAssignment | null)[] = assignments.map((a) =>
+        (a && a.uniqueId === dragData.uniqueId) ? null : a,
+      );
+      // Extend array to reach dropIndex
+      while (newArr.length <= dropIndex) newArr.push(null);
+      newArr[dropIndex] = { uniqueId: dragData.uniqueId, shipId: dragData.shipId };
+      // Trim trailing nulls
+      while (newArr.length > 0 && newArr[newArr.length - 1] === null) {
+        newArr.pop();
+      }
+      onReorder?.(tagId, newArr);
+    } else {
+      // Cross-tag: move ship
+      onDropShip?.(tagId, dragData.uniqueId, dragData.shipId, dragData.sourceTagId, dropIndex);
+    }
+  }
+
+  // Drop on a specific cell
+  const handleCellDrop = useCallback((e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setColumnDragOver(false);
+
+    const raw = e.dataTransfer.getData("application/json");
+    if (!raw) return;
+
+    try {
+      const dragData: DragPayload = JSON.parse(raw);
+      processDrop(dragData, dropIndex);
+    } catch { /* invalid data */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignments, slots, tagId, onReorder, onDropShip]);
+
+  // Drop on the column body (not a specific cell) → place at first available slot
+  const handleColumnDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setColumnDragOver(false);
+
+    const raw = e.dataTransfer.getData("application/json");
+    if (!raw) return;
+
+    try {
+      const dragData: DragPayload = JSON.parse(raw);
+      // First empty slot = first null in the compacted array
+      const compacted = assignments.filter((a): a is LockAssignment => a !== null);
+      // Remove the dragged ship from compacted view for source-tag calculation
+      const withoutDragged = compacted.filter(a => a.uniqueId !== dragData.uniqueId);
+      const targetIndex = withoutDragged.length;
+      processDrop(dragData, targetIndex);
+    } catch { /* invalid data */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignments, tagId, onReorder, onDropShip]);
+
+  return (
+    <div
+      className={cn(
+        "flex w-fit flex-col rounded-xl border border-slate-700/50 bg-slate-800/60 p-3",
+        columnDragOver && "ring-2 ring-blue-400/50",
+      )}
+      onDragOver={handleDragOver}
+      onDragEnter={handleColumnDragEnter}
+      onDragLeave={handleColumnDragLeave}
+      onDrop={handleColumnDrop}
+    >
+      <div className={cn("mb-2 flex items-center justify-between gap-2 px-2 py-1 rounded-lg", tagColorClass)}>
+        <span className="text-sm font-bold text-slate-800 whitespace-nowrap">{tagName}</span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={visibleCount <= 1}
+            onClick={() => setSlotCount((prev) => Math.max(1, prev - 1))}
+            className={cn(
+              "flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition text-slate-700",
+              visibleCount <= 1
+                ? "opacity-30 cursor-not-allowed"
+                : "hover:bg-black/10",
+            )}
+          >
+            −
+          </button>
+          <Badge variant="accent" className="text-xs px-1 min-w-[2.25rem] justify-center bg-white/60 text-slate-700 border-white/30">
+            {filledCount}/{slotCount}
+          </Badge>
+          <button
+            type="button"
+            disabled={visibleCount >= MAX_SLOTS}
+            onClick={() => setSlotCount((prev) => Math.min(MAX_SLOTS, prev + 1))}
+            className={cn(
+              "flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition text-slate-700",
+              visibleCount >= MAX_SLOTS
+                ? "opacity-30 cursor-not-allowed"
+                : "hover:bg-black/10",
+            )}
+          >
+            +
+          </button>
+        </div>
+      </div>
+      <div className="flex gap-1.5">
+        {columns.map((colSlots, colIndex) => (
+          <div key={colIndex} className="flex w-[150px] flex-col gap-1.5">
+            {colSlots.map((assignment, rowIndex) => {
+              const globalIndex = colIndex * ROWS_PER_COL + rowIndex;
+              return (
+<ShipCell
+  key={assignment?.uniqueId ?? `empty-${colIndex}-${rowIndex}`}
+  assignment={assignment}
+  ship={assignment ? shipByUniqueId.get(assignment.uniqueId) : null}
+  tagColorClass={tagColorClass}
+  onClick={() => onCellClick(tagId, globalIndex)}
+  onRemove={() => { if (assignment) onRemoveShip(tagId, assignment.uniqueId); }}
+  onDragStart={assignment ? ((e) => handleDragStart(e, assignment)) : undefined}
+  onDrop={(e) => handleCellDrop(e, globalIndex)}
+  onDragOver={handleDragOver}
+  columnDragOver={columnDragOver}
+/>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

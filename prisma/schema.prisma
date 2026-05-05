@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  name           String          @unique
+  pinCode        String
+  shipData       String?
+  routineRecords RoutineRecord[]
+  lockPlans      LockPlan[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model RoutineRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  seaArea     String
+  missionName String
+  airControl  Int
+  note        String?
+  imageUrl    String?
+  fleetData   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, seaArea])
+  @@index([createdAt])
+}
+
+model StrategyPost {
+  id              String   @id @default(cuid())
+  phaseName       String
+  title           String
+  content         String
+  fleetImageUrl   String?
+  airbaseImageUrl String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([phaseName])
+  @@index([createdAt])
+}
+
+model LockTag {
+  id         String     @id @default(cuid())
+  name       String     @unique
+  colorClass String
+  sortOrder  Int        @default(0)
+  isActive   Boolean    @default(true)
+  lockPlans  LockPlan[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model LockPlan {
+  id           String   @id @default(cuid())
+  userId       String
+  tagId        String
+  assignedData String
+  note         String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tag  LockTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tagId])
+  @@index([userId])
+  @@index([tagId])
+}
