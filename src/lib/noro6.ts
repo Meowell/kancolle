@@ -125,19 +125,18 @@ export function parseNoro6Data(value: string): Noro6Data {
       throw new Error(`noro6 存档格式错误：ships[${index}] 不是对象。`);
     }
 
-    const current = ship as { id?: unknown; lv?: unknown; st?: unknown };
-
-    const id = current.id;
-    const lv = current.lv;
+    const raw = ship as Record<string, unknown>;
+    const id = raw.ship_id ?? raw.id;
+    const lv = raw.lv;
 
     if (!Number.isInteger(id) || !Number.isInteger(lv)) {
-      throw new Error(`noro6 存档格式错误：ships[${index}] 必须包含数字 id 和 lv。`);
+      throw new Error(`noro6 存档格式错误：ships[${index}] 必须包含数字 id/ship_id 和 lv。`);
     }
 
     return {
       id: id as number,
       lv: lv as number,
-      st: Array.isArray(current.st) ? current.st.filter((value): value is number => typeof value === "number") : undefined,
+      st: Array.isArray(raw.st) ? (raw.st as unknown[]).filter((value): value is number => typeof value === "number") : undefined,
     };
   });
 
