@@ -34,6 +34,7 @@ export const strategyPostSchema = z.object({
   content: z.string().min(1).max(20000),
   fleetImageUrl: z.string().max(500).optional().nullable(),
   airbaseImageUrl: z.string().max(500).optional().nullable(),
+  routineCardIds: z.string().max(500).optional().nullable(),
 });
 
 export const tagColorClasses = [

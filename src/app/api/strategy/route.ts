@@ -9,13 +9,14 @@ export async function GET() {
 
   const posts = await prisma.strategyPost.findMany({
     orderBy: [{ phaseName: "asc" }, { createdAt: "desc" }],
+    include: { user: { select: { id: true, name: true, avatarUrl: true } } },
   });
 
   return NextResponse.json({ posts });
 }
 
 export async function POST(request: Request) {
-  await requireApiUser();
+  const user = await requireApiUser();
   const parsed = strategyPostSchema.safeParse(await request.json());
 
   if (!parsed.success) {
@@ -24,11 +25,13 @@ export async function POST(request: Request) {
 
   const post = await prisma.strategyPost.create({
     data: {
+      userId: user.id,
       phaseName: parsed.data.phaseName,
       title: parsed.data.title,
       content: parsed.data.content,
       fleetImageUrl: parsed.data.fleetImageUrl || null,
       airbaseImageUrl: parsed.data.airbaseImageUrl || null,
+      routineCardIds: parsed.data.routineCardIds || null,
     },
   });
 
@@ -36,12 +39,16 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  await requireApiUser();
+  const user = await requireApiUser();
   const parsed = strategyPostSchema.safeParse(await request.json());
 
   if (!parsed.success || !parsed.data.id) {
     return NextResponse.json({ error: "缺少攻略贴 ID" }, { status: 400 });
   }
+
+  const existing = await prisma.strategyPost.findUnique({ where: { id: parsed.data.id } });
+  if (!existing) return NextResponse.json({ error: "攻略贴不存在" }, { status: 404 });
+  if (existing.userId !== user.id) return NextResponse.json({ error: "只能编辑自己的攻略贴" }, { status: 403 });
 
   const post = await prisma.strategyPost.update({
     where: { id: parsed.data.id },
@@ -51,6 +58,7 @@ export async function PATCH(request: Request) {
       content: parsed.data.content,
       fleetImageUrl: parsed.data.fleetImageUrl || null,
       airbaseImageUrl: parsed.data.airbaseImageUrl || null,
+      routineCardIds: parsed.data.routineCardIds || null,
     },
   });
 
@@ -58,13 +66,15 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  await requireApiUser();
+  const user = await requireApiUser();
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
-  if (!id) {
-    return NextResponse.json({ error: "缺少攻略贴 ID" }, { status: 400 });
-  }
+  if (!id) return NextResponse.json({ error: "缺少攻略贴 ID" }, { status: 400 });
+
+  const existing = await prisma.strategyPost.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: "攻略贴不存在" }, { status: 404 });
+  if (existing.userId !== user.id) return NextResponse.json({ error: "只能删除自己的攻略贴" }, { status: 403 });
 
   await prisma.strategyPost.delete({ where: { id } });
 

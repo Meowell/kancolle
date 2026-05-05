@@ -1,10 +1,22 @@
 import { StrategyEditor } from "@/components/strategy/strategy-editor";
+import { requireCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export default async function StrategyPage() {
-  const posts = await prisma.strategyPost.findMany({
-    orderBy: [{ phaseName: "asc" }, { createdAt: "desc" }],
-  });
+  const user = await requireCurrentUser();
+
+  const [posts, routineRecords] = await Promise.all([
+    prisma.strategyPost.findMany({
+      orderBy: [{ phaseName: "asc" }, { createdAt: "desc" }],
+      include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+    }),
+    prisma.routineRecord.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: { user: { select: { id: true, name: true } } },
+    }),
+  ]);
+
   const serializablePosts = posts.map((post) => ({
     id: post.id,
     phaseName: post.phaseName,
@@ -12,6 +24,21 @@ export default async function StrategyPage() {
     content: post.content,
     fleetImageUrl: post.fleetImageUrl,
     airbaseImageUrl: post.airbaseImageUrl,
+    routineCardIds: post.routineCardIds,
+    user: { id: post.user.id, name: post.user.name, avatarUrl: post.user.avatarUrl },
+    createdAt: post.createdAt.toISOString(),
+  }));
+
+  const serializableCards = routineRecords.map((r) => ({
+    id: r.id,
+    seaArea: r.seaArea,
+    missionName: r.missionName,
+    airControl: r.airControl,
+    note: r.note,
+    imageUrl: r.imageUrl,
+    fleetData: r.fleetData,
+    createdAt: r.createdAt.toISOString(),
+    user: { id: r.user.id, name: r.user.name },
   }));
 
   return (
@@ -22,7 +49,7 @@ export default async function StrategyPage() {
           全员共享的阶段攻略 — 打法、路线、配装思路与截图。
         </p>
       </div>
-      <StrategyEditor posts={serializablePosts} />
+      <StrategyEditor posts={serializablePosts} currentUserId={user.id} routineCards={serializableCards} />
     </div>
   );
 }
