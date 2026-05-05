@@ -15,7 +15,15 @@ import shipHpData from "@/data/shipHp.json";
 
 /* ── Master data ── */
 
-type ShipMaster = { api_id: number; api_name: string; api_stype: number };
+type ShipMaster = {
+  api_id: number;
+  api_name: string;
+  api_stype: number;
+  api_houg?: number | number[];
+  api_raig?: number | number[];
+  api_souk?: number | number[];
+  api_luck?: number | number[];
+};
 type StypeMaster = { api_id: number; api_name: string };
 
 const allShips = start2.api_mst_ship as ShipMaster[];
