@@ -21,3 +21,6 @@ prisma/*.db-journal
 # OS files
 .DS_Store
 Thumbs.db
+
+# User uploaded files
+public/uploads/*
